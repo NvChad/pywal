@@ -48,7 +48,5 @@ def reload_nvim():
         except Exception as e:
             print(f"Error connecting to Neovim at {socket}: {e}")
 
-copy_file("./base46-pywal.lua", f"{home_dir}/.config/wal/templates/base46-pywal.lua")
-
 copy_file(f"{home_dir}/.cache/wal/base46-pywal.lua", f"{home_dir}/.config/nvim/lua/themes/wal.lua")
 reload_nvim()
