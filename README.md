@@ -8,3 +8,4 @@ This repository contains a color scheme template for wal, along with a script to
 2. Change into the pywal directory: `cd pywal`
 3. Run `python first_run.py` to copy the theme template into wals pywal template directory
 4. Run wal, specifying the -o option with the path to reload.py. For example: `wal -i /path/to/image.png -o ~/pywal/reload.py`
+5. Run neovim and press <leader>+th and set your theme to `wal`
