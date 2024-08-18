@@ -19,6 +19,6 @@ local nvim_config_path = vim.fn.stdpath('config')
 local python_script = nvim_config_path .. "/pywal/reload.py"
 os.execute("python3 " .. python_script .. " &> /dev/null &")
 ```
-
+And now you just need to change your selected theme to `wal`. Done!
 ## Demo
 https://github.com/user-attachments/assets/66e73083-6f83-472f-8cb0-7456f0a37069
