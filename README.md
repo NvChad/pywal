@@ -21,4 +21,4 @@ os.execute("python3 " .. python_script .. " &> /dev/null &")
 ```
 
 ## Demo
-
+https://github.com/user-attachments/assets/66e73083-6f83-472f-8cb0-7456f0a37069
