@@ -168,6 +168,7 @@ def monitor_file(file_path):
         time.sleep(1)
 
 if __name__ == "__main__":
+    on_file_modified()
     acquire_lock()
     try:
         monitor_file(cache_src)
