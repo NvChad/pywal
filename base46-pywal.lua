@@ -27,11 +27,12 @@ M.base_30 = {{
   teal = "{color4}",
   orange = "{color1}",
   cyan = "{color4}",
-  statusline_bg = "{color0}",
-  lightbg = "{color0}",
   pmenu_bg = "{color8}",
   folder_bg = "{color4}",
 }}
+
+M.base_30.statusline_bg = M.base_30.black2
+M.base_30.lightbg = M.base_30.one_bg
 
 M.base_16 = {{
   base00 = "{color0}",
