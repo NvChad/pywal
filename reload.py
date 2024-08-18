@@ -94,21 +94,20 @@ def generate_colors(base_color, yellow_color):
     return colors
 
 def replace_colors_in_file(file_path):
-    with open(file_path, 'r') as file:
-        content = file.read()
+    while True:
+        with open(file_path, 'r') as file:
+            content = file.read()
 
-    black_match = re.search(r'black\s*=\s*"(#\w+)"', content)
-    yellow_match = re.search(r'yellow\s*=\s*"(#\w+)"', content)
-    
-    if black_match:
-        black_color = black_match.group(1)
-    else:
-        raise ValueError("'black' was not found in the file.")
-    
-    if yellow_match:
-        yellow_color = yellow_match.group(1)
-    else:
-        raise ValueError("'yellow' was not found in the file.")
+        black_match = re.search(r'black\s*=\s*"(#\w+)"', content)
+        yellow_match = re.search(r'yellow\s*=\s*"(#\w+)"', content)
+
+        if black_match and yellow_match:
+            black_color = black_match.group(1)
+            yellow_color = yellow_match.group(1)
+            break
+        else:
+            print("black or yellow not found, retrying in 1 second...")
+            time.sleep(1)
 
     new_colors = generate_colors(black_color, yellow_color)
 
