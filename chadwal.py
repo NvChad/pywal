@@ -14,7 +14,7 @@ home_dir = os.path.expanduser("~")
 template_src = "./base46-pywal.lua"
 template_dst = f"{home_dir}/.config/wal/templates/base46-pywal.lua"
 cache_src = f"{home_dir}/.cache/wal/base46-pywal.lua"
-cache_dst = f"{home_dir}/.local/share/nvim/lazy/base46/lua/base46/themes/wal.lua"
+cache_dst = f"{home_dir}/.local/share/nvim/lazy/base46/lua/base46/themes/chadwal.lua"
 lock_file = "/tmp/wal_nvim_lock"
 
 def acquire_lock():
