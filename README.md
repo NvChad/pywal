@@ -19,6 +19,8 @@ local nvim_config_path = vim.fn.stdpath('config')
 local python_script = nvim_config_path .. "/pywal/chadwal.py"
 os.execute("python3 " .. python_script .. " &> /dev/null &")
 ```
-And now you just need to change your selected theme to `chadwal`. Done!
+Now you need to generate you Pywal theme again using `wal -i <image>`. If not, `chadwal` will default to `gruvchad` colors.
+
+Select `chadwal` theme and enjoy!
 ## Demo
 https://github.com/user-attachments/assets/66e73083-6f83-472f-8cb0-7456f0a37069

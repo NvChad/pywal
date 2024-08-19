@@ -15,6 +15,7 @@ template_src = "./base46-pywal.lua"
 template_dst = f"{home_dir}/.config/wal/templates/base46-pywal.lua"
 cache_src = f"{home_dir}/.cache/wal/base46-pywal.lua"
 cache_dst = f"{home_dir}/.local/share/nvim/lazy/base46/lua/base46/themes/chadwal.lua"
+fallback_theme = f"{home_dir}/.local/share/nvim/lazy/base46/lua/base46/themes/gruvchad.lua"
 lock_file = "/tmp/wal_nvim_lock"
 
 def acquire_lock():
@@ -143,6 +144,7 @@ def reload_nvim():
 def on_file_modified():
     print(f"File {cache_src} modified. Executing functions...")
 
+    copy_file_if_not_exists(fallback_theme, cache_src)
     copy_file(template_src, template_dst)
     copy_file(cache_src, cache_dst)
     replace_colors_in_file(cache_dst)
