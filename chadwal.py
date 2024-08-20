@@ -73,7 +73,7 @@ def adjust_color(color_hex, percentage):
     v = max(0, min(1, v + (percentage * factor / 100.0)))
 
     if v <= 0.01:
-        v = max(0.15, v + abs(percentage) * 0.5 / 100.0)
+        v = max(0.05, v + abs(percentage) * 0.5 / 100.0)
     elif v >= 0.99:
         v = min(0.95, v - abs(percentage) * 0.5 / 100.0)
 
