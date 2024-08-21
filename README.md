@@ -13,7 +13,7 @@ git clone https://github.com/NvChad/pywal
 mv pywal ~/.config/nvim/pywal
 cd ~/.config/nvim
 ```
-Add this line at the end of your `init.lua` file:
+Add this at the end of your `init.lua` file:
 ```lua
 local nvim_config_path = vim.fn.stdpath('config')
 local python_script = nvim_config_path .. "/pywal/chadwal.py"
