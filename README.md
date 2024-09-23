@@ -5,7 +5,7 @@
 > - `pywal`
 > - `psutil`
 > - `pynvim`
-> - `inotify`
+> - `watchdog`
 
 ## Installation
 ```bash

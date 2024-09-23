@@ -5,10 +5,11 @@ import psutil
 import shutil
 import pynvim
 import re
-import inotify.adapters
 import sys
 import time
 from colorsys import rgb_to_hsv, hsv_to_rgb
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
 
 home_dir = os.path.expanduser("~")
 template_src = "./base46-pywal.lua"
@@ -150,23 +151,28 @@ def on_file_modified():
     replace_colors_in_file(cache_dst)
     reload_nvim()
 
+class MyHandler(FileSystemEventHandler):
+    def on_modified(self, event):
+        if event.src_path == cache_src:
+            on_file_modified()
+
 def monitor_file(file_path):
-    i = inotify.adapters.Inotify()
-    i.add_watch(os.path.dirname(file_path))
+    event_handler = MyHandler()
+    observer = Observer()
+    observer.schedule(event_handler, os.path.dirname(file_path), recursive=False)
+    observer.start()
 
-    while True:
-        for event in i.event_gen(yield_nones=False, timeout_s=1):
-            (_, type_names, path, filename) = event
-
-            if 'IN_MODIFY' in type_names and filename == os.path.basename(file_path):
-                on_file_modified()
-
-        if not get_nvim_sockets():
-            print("No more Neovim processes running. Exiting...")
-            release_lock()
-            sys.exit(0)
-
-        time.sleep(1)
+    try:
+        while True:
+            if not get_nvim_sockets():
+                print("No more Neovim processes running. Exiting...")
+                release_lock()
+                observer.stop()
+                sys.exit(0)
+            time.sleep(1)
+    finally:
+        observer.stop()
+        observer.join()
 
 if __name__ == "__main__":
     on_file_modified()
