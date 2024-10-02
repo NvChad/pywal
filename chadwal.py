@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 
 import os
-import psutil
+import subprocess
 import shutil
-import pynvim
 import re
 import sys
 import time
@@ -119,29 +118,6 @@ def replace_colors_in_file(file_path):
     with open(file_path, 'w') as file:
         file.write(content)
 
-def get_nvim_sockets():
-    sockets = []
-    for proc in psutil.process_iter(['pid', 'name']):
-        if proc.info['name'] == 'nvim':
-            try:
-                for conn in proc.net_connections(kind='unix'):
-                    if conn.laddr:
-                        sockets.append(conn.laddr)
-            except (psutil.AccessDenied, psutil.NoSuchProcess):
-                continue
-    return sockets
-
-def reload_nvim():
-    sockets = get_nvim_sockets()
-    for socket in sockets:
-        try:
-            nvim = pynvim.attach('socket', path=socket)
-            nvim.command('lua require("nvchad.utils").reload("themes")')
-            nvim.close()
-            print(f"Neovim instance at {socket} reloaded successfully.")
-        except Exception as e:
-            print(f"Error connecting to Neovim at {socket}: {e}")
-
 def on_file_modified():
     print(f"File {cache_src} modified. Executing functions...")
 
@@ -149,7 +125,7 @@ def on_file_modified():
     copy_file(template_src, template_dst)
     copy_file(cache_src, cache_dst)
     replace_colors_in_file(cache_dst)
-    reload_nvim()
+    subprocess.run(['killall', '-SIGUSR1', 'nvim'])
 
 class MyHandler(FileSystemEventHandler):
     def on_modified(self, event):
@@ -164,15 +140,10 @@ def monitor_file(file_path):
 
     try:
         while True:
-            if not get_nvim_sockets():
-                print("No more Neovim processes running. Exiting...")
-                release_lock()
-                observer.stop()
-                sys.exit(0)
             time.sleep(1)
-    finally:
+    except KeyboardInterrupt:
         observer.stop()
-        observer.join()
+    observer.join()
 
 if __name__ == "__main__":
     on_file_modified()

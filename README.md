@@ -3,21 +3,27 @@
 > [!NOTE]
 > Support for Pywal requires these Python libraries to be installed:
 > - `pywal`
-> - `psutil`
-> - `pynvim`
 > - `watchdog`
 
 ## Installation
 ```bash
-git clone https://github.com/NvChad/pywal
-mv pywal ~/.config/nvim/pywal
 cd ~/.config/nvim
+git clone https://github.com/NvChad/pywal
 ```
 Add this at the end of your `init.lua` file:
 ```lua
 local nvim_config_path = vim.fn.stdpath('config')
 local python_script = nvim_config_path .. "/pywal/chadwal.py"
 os.execute("python3 " .. python_script .. " &> /dev/null &")
+
+local autocmd = vim.api.nvim_create_autocmd
+
+autocmd("Signal", {
+  pattern = "SIGUSR1",
+  callback = function()
+    require('nvchad.utils').reload()
+  end
+})
 ```
 Now you need to generate you Pywal theme again using `wal -i <image>`. If not, `chadwal` will default to `gruvchad` colors.
 
