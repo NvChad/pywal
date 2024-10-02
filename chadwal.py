@@ -124,7 +124,7 @@ def get_nvim_sockets():
     for proc in psutil.process_iter(['pid', 'name']):
         if proc.info['name'] == 'nvim':
             try:
-                for conn in proc.connections(kind='unix'):
+                for conn in proc.net_connections(kind='unix'):
                     if conn.laddr:
                         sockets.append(conn.laddr)
             except (psutil.AccessDenied, psutil.NoSuchProcess):
