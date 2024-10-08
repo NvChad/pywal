@@ -9,10 +9,11 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
 # Constants
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 HOME_DIR = os.path.expanduser("~")
 TEMPLATE_SRC = {
-    "dark": "./dark.lua",
-    "light": "./light.lua"
+    "dark": os.path.join(SCRIPT_DIR, "dark.lua"),
+    "light": os.path.join(SCRIPT_DIR, "light.lua")
 }
 TEMPLATE_DST = {
     "dark": f"{HOME_DIR}/.config/wal/templates/base46-dark.lua",
