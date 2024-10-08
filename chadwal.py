@@ -1,102 +1,91 @@
 #!/usr/bin/env python3
 
 import os
-import subprocess
 import shutil
 import sys
 import time
+import subprocess
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
-home_dir = os.path.expanduser("~")
-template_src_dark = "./dark.lua"
-template_src_light = "./light.lua"
-template_dst_dark = f"{home_dir}/.config/wal/templates/base46-dark.lua"
-template_dst_light = f"{home_dir}/.config/wal/templates/base46-light.lua"
-cache_src_dark = f"{home_dir}/.cache/wal/base46-dark.lua"
-cache_src_light = f"{home_dir}/.cache/wal/base46-light.lua"
-cache_dst = f"{home_dir}/.local/share/nvim/lazy/base46/lua/base46/themes/chadwal.lua"
-fallback_theme = f"{home_dir}/.local/share/nvim/lazy/base46/lua/base46/themes/gruvchad.lua"
-lock_file = "/tmp/wal_nvim_lock"
-colors_file = f"{home_dir}/.cache/wal/colors"
+# Constants
+HOME_DIR = os.path.expanduser("~")
+TEMPLATE_SRC = {
+    "dark": "./dark.lua",
+    "light": "./light.lua"
+}
+TEMPLATE_DST = {
+    "dark": f"{HOME_DIR}/.config/wal/templates/base46-dark.lua",
+    "light": f"{HOME_DIR}/.config/wal/templates/base46-light.lua"
+}
+CACHE_SRC = {
+    "dark": f"{HOME_DIR}/.cache/wal/base46-dark.lua",
+    "light": f"{HOME_DIR}/.cache/wal/base46-light.lua"
+}
+CACHE_DST = f"{HOME_DIR}/.local/share/nvim/lazy/base46/lua/base46/themes/chadwal.lua"
+FALLBACK_THEME = f"{HOME_DIR}/.local/share/nvim/lazy/base46/lua/base46/themes/gruvchad.lua"
+LOCK_FILE = "/tmp/wal_nvim_lock"
+COLORS_FILE = f"{HOME_DIR}/.cache/wal/colors"
 
+# Utility functions
 def is_dark(hex_color):
+    """Determine if the color is dark based on luminance."""
     hex_color = hex_color.lstrip('#')
-    r = int(hex_color[0:2], 16)
-    g = int(hex_color[2:4], 16)
-    b = int(hex_color[4:6], 16)
+    r, g, b = (int(hex_color[i:i+2], 16) for i in (0, 2, 4))
     brightness = (r * 299 + g * 587 + b * 114) / 1000
     return brightness < 128
 
 def get_hex_from_colors_file():
+    """Read the first color from the colors file."""
     try:
-        with open(colors_file, 'r') as file:
-            first_line = file.readline().strip()
-            return first_line
+        with open(COLORS_FILE, 'r') as file:
+            return file.readline().strip()
     except FileNotFoundError:
-        print(f"Colors file not found: {colors_file}")
-        return None
+        sys.exit(f"Error: Colors file not found: {COLORS_FILE}")
 
 def acquire_lock():
-    if os.path.exists(lock_file):
-        print("Another instance is already running. Exiting...")
-        sys.exit(0)
-    else:
-        open(lock_file, 'w').close()
+    """Create a lock file to prevent multiple instances."""
+    if os.path.exists(LOCK_FILE):
+        sys.exit("Another instance is already running. Exiting...")
+    open(LOCK_FILE, 'w').close()
 
 def release_lock():
-    if os.path.exists(lock_file):
-        os.remove(lock_file)
+    """Remove the lock file."""
+    if os.path.exists(LOCK_FILE):
+        os.remove(LOCK_FILE)
 
-def copy_file_if_not_exists(src, dst):
-    try:
-        if not os.path.exists(dst):
-            os.makedirs(os.path.dirname(dst), exist_ok=True)
-            shutil.copy(src, dst)
-            print(f"File successfully copied from {src} to {dst}.")
-        else:
-            print(f"File already exists at {dst}, skipping copy.")
-    except FileNotFoundError:
-        print(f"File not found: {src}")
-    except PermissionError:
-        print(f"Permission denied to copy from {src} to {dst}")
-    except Exception as e:
-        print(f"An error occurred while copying from {src} to {dst}: {e}")
+def copy_file(src, dst, skip_if_exists=False):
+    """Copy a file from src to dst, optionally skipping if dst exists."""
+    if skip_if_exists and os.path.exists(dst):
+        print(f"File already exists at {dst}, skipping copy.")
+        return
 
-def copy_file(src, dst):
     try:
         os.makedirs(os.path.dirname(dst), exist_ok=True)
         shutil.copy(src, dst)
-        print(f"File successfully copied from {src} to {dst}.")
-    except FileNotFoundError:
-        print(f"File not found: {src}")
-    except PermissionError:
-        print(f"Permission denied to copy from {src} to {dst}")
+        print(f"File copied from {src} to {dst}.")
     except Exception as e:
-        print(f"An error occurred while copying from {src} to {dst}: {e}")
+        sys.exit(f"Error copying file from {src} to {dst}: {e}")
 
 def on_file_modified():
-    if is_dark(get_hex_from_colors_file()):
-        template_src = template_src_dark
-        template_dst = template_dst_dark
-        cache_src = cache_src_dark
-    else:
-        template_src = template_src_light
-        template_dst = template_dst_light
-        cache_src = cache_src_light
-
-    copy_file_if_not_exists(fallback_theme, cache_src)
-    copy_file(template_src, template_dst)
-    copy_file(cache_src, cache_dst)
+    """Handle file modifications based on current color scheme."""
+    is_dark_theme = is_dark(get_hex_from_colors_file())
+    mode = "dark" if is_dark_theme else "light"
+    
+    copy_file(FALLBACK_THEME, CACHE_SRC[mode], skip_if_exists=True)
+    copy_file(TEMPLATE_SRC[mode], TEMPLATE_DST[mode])
+    copy_file(CACHE_SRC[mode], CACHE_DST)
     
     subprocess.run(['killall', '-SIGUSR1', 'nvim'])
 
+# Watchdog event handler
 class MyHandler(FileSystemEventHandler):
     def on_modified(self, event):
-        if event.src_path == cache_src_dark:
+        if event.src_path == CACHE_SRC["dark"]:
             on_file_modified()
 
 def monitor_file(file_path):
+    """Monitor the specified file for changes."""
     event_handler = MyHandler()
     observer = Observer()
     observer.schedule(event_handler, os.path.dirname(file_path), recursive=False)
@@ -110,9 +99,9 @@ def monitor_file(file_path):
     observer.join()
 
 if __name__ == "__main__":
-    on_file_modified()
     acquire_lock()
     try:
-        monitor_file(cache_src_dark)
+        on_file_modified()
+        monitor_file(CACHE_SRC["dark"])
     finally:
         release_lock()
