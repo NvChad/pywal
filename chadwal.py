@@ -99,6 +99,7 @@ def monitor_file(file_path):
     observer.join()
 
 if __name__ == "__main__":
+    on_file_modified()
     acquire_lock()
     try:
         on_file_modified()
