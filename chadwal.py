@@ -3,20 +3,39 @@
 import os
 import subprocess
 import shutil
-import re
 import sys
 import time
-from colorsys import rgb_to_hsv, hsv_to_rgb
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
 home_dir = os.path.expanduser("~")
-template_src = "./base46-pywal.lua"
-template_dst = f"{home_dir}/.config/wal/templates/base46-pywal.lua"
-cache_src = f"{home_dir}/.cache/wal/base46-pywal.lua"
+template_src_dark = "./dark.lua"
+template_src_light = "./light.lua"
+template_dst_dark = f"{home_dir}/.config/wal/templates/base46-dark.lua"
+template_dst_light = f"{home_dir}/.config/wal/templates/base46-light.lua"
+cache_src_dark = f"{home_dir}/.cache/wal/base46-dark.lua"
+cache_src_light = f"{home_dir}/.cache/wal/base46-light.lua"
 cache_dst = f"{home_dir}/.local/share/nvim/lazy/base46/lua/base46/themes/chadwal.lua"
 fallback_theme = f"{home_dir}/.local/share/nvim/lazy/base46/lua/base46/themes/gruvchad.lua"
 lock_file = "/tmp/wal_nvim_lock"
+colors_file = f"{home_dir}/.cache/wal/colors"
+
+def is_dark(hex_color):
+    hex_color = hex_color.lstrip('#')
+    r = int(hex_color[0:2], 16)
+    g = int(hex_color[2:4], 16)
+    b = int(hex_color[4:6], 16)
+    brightness = (r * 299 + g * 587 + b * 114) / 1000
+    return brightness < 128
+
+def get_hex_from_colors_file():
+    try:
+        with open(colors_file, 'r') as file:
+            first_line = file.readline().strip()
+            return first_line
+    except FileNotFoundError:
+        print(f"Colors file not found: {colors_file}")
+        return None
 
 def acquire_lock():
     if os.path.exists(lock_file):
@@ -56,80 +75,25 @@ def copy_file(src, dst):
     except Exception as e:
         print(f"An error occurred while copying from {src} to {dst}: {e}")
 
-def is_dark(hex_color):
-    hex_color = hex_color.lstrip('#')
-    r = int(hex_color[0:2], 16)
-    g = int(hex_color[2:4], 16)
-    b = int(hex_color[4:6], 16)
-    brightness = (r * 299 + g * 587 + b * 114) / 1000
-    return brightness < 128
-
-def adjust_color(color_hex, percentage):
-    color_hex = color_hex.lstrip('#')
-    r, g, b = tuple(int(color_hex[i:i+2], 16) for i in (0, 2, 4))
-    h, s, v = rgb_to_hsv(r / 255.0, g / 255.0, b / 255.0)
-
-    factor = 1 if is_dark(color_hex) else -1
-    v = max(0, min(1, v + (percentage * factor / 100.0)))
-
-    if v <= 0.01:
-        v = max(0.05, v + abs(percentage) * 0.5 / 100.0)
-    elif v >= 0.99:
-        v = min(0.95, v - abs(percentage) * 0.5 / 100.0)
-
-    r, g, b = hsv_to_rgb(h, s, v)
-    return f"#{int(r * 255):02x}{int(g * 255):02x}{int(b * 255):02x}"
-
-def generate_colors(base_color, yellow_color):
-    colors = {}
-    colors['darker_black'] = adjust_color(base_color, -3)
-    colors['black2'] = adjust_color(base_color, 6)
-    colors['one_bg'] = adjust_color(base_color, 10)
-    colors['one_bg2'] = adjust_color(colors['one_bg'], 6)
-    colors['one_bg3'] = adjust_color(colors['one_bg2'], 6)
-    colors['grey'] = adjust_color(base_color, 40)
-    colors['grey_fg'] = adjust_color(colors['grey'], 10)
-    colors['grey_fg2'] = adjust_color(colors['grey_fg'], 5)
-    colors['line'] = adjust_color(base_color, 15)
-    colors['sun'] = adjust_color(yellow_color, 8)
-    return colors
-
-def replace_colors_in_file(file_path):
-    while True:
-        with open(file_path, 'r') as file:
-            content = file.read()
-
-        black_match = re.search(r'black\s*=\s*"(#\w+)"', content)
-        yellow_match = re.search(r'yellow\s*=\s*"(#\w+)"', content)
-
-        if black_match and yellow_match:
-            black_color = black_match.group(1)
-            yellow_color = yellow_match.group(1)
-            break
-        else:
-            print("black or yellow not found, retrying in 1 second...")
-            time.sleep(1)
-
-    new_colors = generate_colors(black_color, yellow_color)
-
-    for name, color in new_colors.items():
-        content = re.sub(rf'{name}\s*=\s*"(#\w+)"', f'{name} = "{color}"', content)
-
-    with open(file_path, 'w') as file:
-        file.write(content)
-
 def on_file_modified():
-    print(f"File {cache_src} modified. Executing functions...")
+    if is_dark(get_hex_from_colors_file()):
+        template_src = template_src_dark
+        template_dst = template_dst_dark
+        cache_src = cache_src_dark
+    else:
+        template_src = template_src_light
+        template_dst = template_dst_light
+        cache_src = cache_src_light
 
     copy_file_if_not_exists(fallback_theme, cache_src)
     copy_file(template_src, template_dst)
     copy_file(cache_src, cache_dst)
-    replace_colors_in_file(cache_dst)
+    
     subprocess.run(['killall', '-SIGUSR1', 'nvim'])
 
 class MyHandler(FileSystemEventHandler):
     def on_modified(self, event):
-        if event.src_path == cache_src:
+        if event.src_path == cache_src_dark:
             on_file_modified()
 
 def monitor_file(file_path):
@@ -149,6 +113,6 @@ if __name__ == "__main__":
     on_file_modified()
     acquire_lock()
     try:
-        monitor_file(cache_src)
+        monitor_file(cache_src_dark)
     finally:
         release_lock()

@@ -1,16 +1,14 @@
 local M = {{}}
 
+local lighten = require("base46.colors").change_hex_lightness
+
 M.base_30 = {{
   white = "{color7}",
-  darker_black = "{color0}",
+  darker_black = lighten("{color0}", -3),
   black = "{color0}",
-  black2 = "{color0}",
-  one_bg = "{color0}",
-  one_bg2 = "{color8}",
-  one_bg3 = "{color8}",
-  grey = "{color8}",
-  grey_fg = "{color8}",
-  grey_fg2 = "{color8}",
+  black2 = lighten("{color0}", -6),
+  one_bg = lighten("{color0}", -10),
+  grey = lighten("{color0}", -40),
   light_grey = "{color8}",
   red = "{color1}",
   baby_pink = "{color9}",
@@ -21,7 +19,7 @@ M.base_30 = {{
   nord_blue = "{color4}",
   blue = "{color4}",
   yellow = "{color3}",
-  sun = "{color3}",
+  sun = lighten("{color3}", -6),
   purple = "{color13}",
   dark_purple = "{color13}",
   teal = "{color4}",
@@ -29,10 +27,14 @@ M.base_30 = {{
   cyan = "{color4}",
   pmenu_bg = "{color8}",
   folder_bg = "{color4}",
-}}
-
-M.base_30.statusline_bg = M.base_30.black2
-M.base_30.lightbg = M.base_30.one_bg
+  }}
+  
+  M.base_30.statusline_bg = M.base_30.black2
+  M.base_30.lightbg = M.base_30.one_bg
+  M.base_30.one_bg2 = lighten(M.base_30.one_bg, -6)
+  M.base_30.one_bg3 = lighten(M.base_30.one_bg2, -6)
+  M.base_30.grey_fg = lighten(M.base_30.grey, -10)
+  M.base_30.grey_fg2 = lighten(M.base_30.grey, -5)
 
 M.base_16 = {{
   base00 = "{color0}",
