@@ -12,9 +12,7 @@ git clone https://github.com/NvChad/pywal
 ```
 Add this at the end of your `init.lua` file:
 ```lua
-local nvim_config_path = vim.fn.stdpath('config')
-local python_script = nvim_config_path .. "/pywal/chadwal.py"
-os.execute("python3 " .. python_script .. " &> /dev/null &")
+os.execute("python ~/.config/nvim/pywal/chadwal.py &> /dev/null &")
 
 local autocmd = vim.api.nvim_create_autocmd
 
