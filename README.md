@@ -27,4 +27,5 @@ Now you need to generate you Pywal theme again using `wal -i <image>`. If not, `
 
 Select `chadwal` theme and enjoy!
 ## Demo
-https://github.com/user-attachments/assets/66e73083-6f83-472f-8cb0-7456f0a37069
+
+https://github.com/user-attachments/assets/494cd14d-ae08-4119-aace-391e4f1abdaf
