@@ -1,5 +1,7 @@
 <h1 align="center">Base46: Pywal Edition</h1>
 
+<p align="center"><i>Pywal and Matugen support for NvChad!</i></p>
+
 > [!NOTE]
 > Support for Pywal requires these Python libraries to be installed:
 > - `pywal`
@@ -23,7 +25,7 @@ autocmd("Signal", {
   end
 })
 ```
-Now you need to generate you Pywal theme again using `wal -i <image>`. If not, `chadwal` will default to `gruvchad` colors.
+Now you need to generate your Pywal theme again using `wal -i <image>`. If not, `chadwal` will default to `gruvchad` colors. Same with Matugen!
 
 Select `chadwal` theme and enjoy!
 ## Demo

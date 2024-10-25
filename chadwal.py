@@ -5,6 +5,7 @@ import shutil
 import sys
 import time
 import subprocess
+import toml
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
@@ -27,6 +28,7 @@ CACHE_DST = f"{HOME_DIR}/.local/share/nvim/lazy/base46/lua/base46/themes/chadwal
 FALLBACK_THEME = f"{HOME_DIR}/.local/share/nvim/lazy/base46/lua/base46/themes/gruvchad.lua"
 LOCK_FILE = "/tmp/wal_nvim_lock"
 COLORS_FILE = f"{HOME_DIR}/.cache/wal/colors"
+TOML_FILE_PATH = f"{HOME_DIR}/.config/matugen/config.toml"
 
 # Utility functions
 def is_dark(hex_color):
@@ -68,6 +70,35 @@ def copy_file(src, dst, skip_if_exists=False):
     except Exception as e:
         sys.exit(f"Error copying file from {src} to {dst}: {e}")
 
+def add_template_to_toml():
+    """Add the nvim template to the TOML file if it doesn't already exist."""
+    new_template = {
+        "nvim": {
+            "input_path": "~/.config/nvim/pywal/matugen.lua",
+            "output_path": "~/.cache/wal/base46-dark.lua"
+        }
+    }
+    
+    try:
+        with open(TOML_FILE_PATH, 'r') as file:
+            config_data = toml.load(file)
+        
+        if "templates" in config_data:
+            if "nvim" not in config_data["templates"]:
+                config_data["templates"]["nvim"] = new_template["nvim"]
+            else:
+                print("La plantilla 'nvim' ya existe en el archivo TOML.")
+        else:
+            config_data["templates"] = new_template
+        
+        with open(TOML_FILE_PATH, 'w') as file:
+            toml.dump(config_data, file)
+        
+        print("La plantilla 'nvim' se ha agregado correctamente.")
+    
+    except FileNotFoundError:
+        sys.exit(f"Error: No se encontró el archivo TOML: {TOML_FILE_PATH}")
+
 def on_file_modified():
     """Handle file modifications based on current color scheme."""
     is_dark_theme = is_dark(get_hex_from_colors_file())
@@ -78,6 +109,7 @@ def on_file_modified():
     copy_file(CACHE_SRC[mode], CACHE_DST)
     
     subprocess.run(['killall', '-SIGUSR1', 'nvim'])
+    add_template_to_toml()
 
 # Watchdog event handler
 class MyHandler(FileSystemEventHandler):
@@ -100,7 +132,6 @@ def monitor_file(file_path):
     observer.join()
 
 if __name__ == "__main__":
-    on_file_modified()
     acquire_lock()
     try:
         on_file_modified()
