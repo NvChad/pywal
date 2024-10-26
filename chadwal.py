@@ -56,6 +56,7 @@ def release_lock():
     """Remove the lock file."""
     if os.path.exists(LOCK_FILE):
         os.remove(LOCK_FILE)
+        print("Lock file removed successfully.")
 
 def copy_file(src, dst, skip_if_exists=False):
     """Copy a file from src to dst, optionally skipping if dst exists."""
@@ -68,7 +69,7 @@ def copy_file(src, dst, skip_if_exists=False):
         shutil.copy(src, dst)
         print(f"File copied from {src} to {dst}.")
     except Exception as e:
-        sys.exit(f"Error copying file from {src} to {dst}: {e}")
+        print(f"Error copying file from {src} to {dst}: {e}")
 
 def add_template_to_toml():
     """Add the nvim template to the TOML file if it doesn't already exist."""
@@ -97,19 +98,36 @@ def add_template_to_toml():
         print("La plantilla 'nvim' se ha agregado correctamente.")
     
     except FileNotFoundError:
-        sys.exit(f"Error: No se encontró el archivo TOML: {TOML_FILE_PATH}")
+        print(f"Error: No se encontró el archivo TOML: {TOML_FILE_PATH}")
+    except Exception as e:
+        print(f"Error al modificar el archivo TOML: {e}")
 
 def on_file_modified():
     """Handle file modifications based on current color scheme."""
-    is_dark_theme = is_dark(get_hex_from_colors_file())
-    mode = "dark" if is_dark_theme else "light"
-    
-    copy_file(FALLBACK_THEME, CACHE_SRC[mode], skip_if_exists=True)
-    copy_file(TEMPLATE_SRC[mode], TEMPLATE_DST[mode])
-    copy_file(CACHE_SRC[mode], CACHE_DST)
-    
-    subprocess.run(['killall', '-SIGUSR1', 'nvim'])
-    add_template_to_toml()
+    try:
+        is_dark_theme = is_dark(get_hex_from_colors_file())
+        mode = "dark" if is_dark_theme else "light"
+        
+        copy_file(FALLBACK_THEME, CACHE_SRC[mode], skip_if_exists=True)
+        copy_file(TEMPLATE_SRC[mode], TEMPLATE_DST[mode])
+        copy_file(CACHE_SRC[mode], CACHE_DST)
+        
+        import psutil
+        
+        def is_nvim_running():
+            for proc in psutil.process_iter(['pid', 'name']):
+                if proc.info['name'] == 'nvim':
+                    return True
+            return False
+        
+        if is_nvim_running():
+            subprocess.run(['killall', '-SIGUSR1', 'nvim'])
+        else:
+            print("No more nvim instances. Stopping script.")
+            sys.exit(0)
+        add_template_to_toml()
+    except Exception as e:
+        print(f"Error during file modification handling: {e}")
 
 # Watchdog event handler
 class MyHandler(FileSystemEventHandler):
@@ -125,7 +143,7 @@ def monitor_file(file_path):
     observer.start()
 
     try:
-        while True:
+        while is_nvim_running():
             time.sleep(1)
     except KeyboardInterrupt:
         observer.stop()
