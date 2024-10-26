@@ -25,7 +25,13 @@ autocmd("Signal", {
   end
 })
 ```
-Now you need to generate your Pywal theme again using `wal -i <image>`. If not, `chadwal` will default to `gruvchad` colors. Same with Matugen!
+Now you need to generate your Pywal theme again using `wal -i <image>`. If not, `chadwal` will default to `gruvchad` colors.
+
+### Matugen support
+Add this line to the `[templates]` section of your `~/.config/matugen/config.toml` file:
+```
+nvim = { input_path = '~/.config/nvim/pywal/matugen.lua', output_path = '~/.cache/wal/base46-dark.lua' }
+```
 
 Select `chadwal` theme and enjoy!
 ## Demo
