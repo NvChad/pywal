@@ -76,11 +76,9 @@ def on_file_modified():
     copy_file(FALLBACK_THEME, CACHE_SRC[mode], skip_if_exists=True)
     copy_file(TEMPLATE_SRC[mode], TEMPLATE_DST[mode])
     copy_file(CACHE_SRC[mode], CACHE_DST)
-    
-    result = subprocess.run(['killall', '-SIGUSR1', 'nvim'], capture_output=True, text=True)
-    if result.returncode != 0:
-        print("No running nvim instances found to signal. Exiting.")
-        sys.exit(0) # Exit gracefully, triggering the finally block
+
+    # Signal running nvim instances, don't exit based on the result here.
+    subprocess.run(['killall', '-SIGUSR1', 'nvim'])
 
 # Watchdog event handler
 class MyHandler(FileSystemEventHandler):
@@ -97,10 +95,20 @@ def monitor_file(file_path):
 
     try:
         while True:
-            time.sleep(1)
+            # Check every 5 seconds if nvim is running
+            time.sleep(5)
+            # Use pgrep to check for exact process name 'nvim'
+            result = subprocess.run(['pgrep', '-x', 'nvim'], capture_output=True)
+            if result.returncode != 0:
+                print("No running nvim instances found. Exiting.")
+                observer.stop() # Stop the observer thread
+                break # Exit the loop
     except KeyboardInterrupt:
+        print("\nKeyboard interrupt received. Exiting.")
         observer.stop()
-    observer.join()
+    finally:
+        # Ensure the observer thread is joined before exiting
+        observer.join()
 
 if __name__ == "__main__":
     on_file_modified()
