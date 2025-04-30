@@ -29,10 +29,20 @@ Now you need to generate your Pywal theme again using `wal -i <image>`. If not, 
 
 ### Matugen support
 Add this line to the `[templates]` section of your `~/.config/matugen/config.toml` file:
-```
+```toml
 nvim = { input_path = '~/.config/nvim/pywal/matugen.lua', output_path = '~/.cache/wal/base46-dark.lua' }
 ```
 
+Alternative syntax:
+```toml
+[templates.nvim]
+input_path = '~/.config/nvim/pywal/matugen.lua'
+output_path = '~/.cache/wal/base46-dark.lua'
+```
+
+Just like with Pywal, you need to generate your theme again using `matugen image <image>`. If not, `chadwal` will default to `gruvchad` colors.
+
 Select `chadwal` theme and enjoy!
+
 ## Demo
 https://github.com/user-attachments/assets/933c97f2-4566-406c-8c04-e2e9f0f3f6da
