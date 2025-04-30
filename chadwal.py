@@ -77,7 +77,10 @@ def on_file_modified():
     copy_file(TEMPLATE_SRC[mode], TEMPLATE_DST[mode])
     copy_file(CACHE_SRC[mode], CACHE_DST)
     
-    subprocess.run(['killall', '-SIGUSR1', 'nvim'])
+    result = subprocess.run(['killall', '-SIGUSR1', 'nvim'], capture_output=True, text=True)
+    if result.returncode != 0:
+        print("No running nvim instances found to signal. Exiting.")
+        sys.exit(0) # Exit gracefully, triggering the finally block
 
 # Watchdog event handler
 class MyHandler(FileSystemEventHandler):
