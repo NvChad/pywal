@@ -34,6 +34,10 @@ Add this your `~/.config/matugen/config.toml` file:
 input_path = '~/.config/nvim/pywal/matugen.lua'
 output_path = '~/.cache/wal/base46-dark.lua'
 
+[templates.nvimlight]
+input_path = '~/.config/nvim/pywal/matugen.lua'
+output_path = '~/.cache/wal/base46-light.lua'
+
 [config.custom_colors.red]
 color = "#FF0000"
 blend = true
