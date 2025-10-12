@@ -38,6 +38,10 @@ output_path = '~/.cache/wal/base46-dark.lua'
 input_path = '~/.config/nvim/pywal/matugen.lua'
 output_path = '~/.cache/wal/base46-light.lua'
 
+[templates.pywal]
+input_path = '~/.config/nvim/pywal/waltemplate'
+output_path = '~/.cache/wal/colors'
+
 [config.custom_colors.red]
 color = "#FF0000"
 blend = true
