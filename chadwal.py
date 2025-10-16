@@ -1,120 +1,279 @@
 #!/usr/bin/env python3
 
+import hashlib
 import os
 import shutil
+import subprocess
 import sys
 import time
-import subprocess
-from watchdog.observers import Observer
+from pathlib import Path
+
 from watchdog.events import FileSystemEventHandler
+from watchdog.observers import Observer
 
 # Constants
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-HOME_DIR = os.path.expanduser("~")
-TEMPLATE_SRC = {
-    "dark": os.path.join(SCRIPT_DIR, "dark.lua"),
-    "light": os.path.join(SCRIPT_DIR, "light.lua")
-}
+SCRIPT_DIR = Path(__file__).parent.resolve()
+HOME_DIR = Path.home()
+TEMPLATE_SRC = {"dark": SCRIPT_DIR / "dark.lua", "light": SCRIPT_DIR / "light.lua"}
 TEMPLATE_DST = {
-    "dark": f"{HOME_DIR}/.config/wal/templates/base46-dark.lua",
-    "light": f"{HOME_DIR}/.config/wal/templates/base46-light.lua"
+    "dark": HOME_DIR / ".config/wal/templates/base46-dark.lua",
+    "light": HOME_DIR / ".config/wal/templates/base46-light.lua",
 }
 CACHE_SRC = {
-    "dark": f"{HOME_DIR}/.cache/wal/base46-dark.lua",
-    "light": f"{HOME_DIR}/.cache/wal/base46-light.lua"
+    "dark": HOME_DIR / ".cache/wal/base46-dark.lua",
+    "light": HOME_DIR / ".cache/wal/base46-light.lua",
 }
-CACHE_DST = f"{HOME_DIR}/.local/share/nvim/lazy/base46/lua/base46/themes/chadwal.lua"
-FALLBACK_THEME = f"{HOME_DIR}/.local/share/nvim/lazy/base46/lua/base46/themes/gruvchad.lua"
-LOCK_FILE = "/tmp/wal_nvim_lock"
-COLORS_FILE = f"{HOME_DIR}/.cache/wal/colors"
+CACHE_DST = HOME_DIR / ".local/share/nvim/lazy/base46/lua/base46/themes/chadwal.lua"
+FALLBACK_THEME = (
+    HOME_DIR / ".local/share/nvim/lazy/base46/lua/base46/themes/gruvchad.lua"
+)
+LOCK_FILE = Path("/tmp/wal_nvim_lock")
+COLORS_FILE = HOME_DIR / ".cache/wal/colors"
 
-# Utility functions
+# State tracking
+last_processed_hash = None
+processing = False
+
+
+def get_file_hash(filepath):
+    """Calculate SHA256 hash of a file."""
+    try:
+        with open(filepath, "rb") as f:
+            return hashlib.sha256(f.read()).hexdigest()
+    except (FileNotFoundError, PermissionError):
+        return None
+
+
 def is_dark(hex_color):
     """Determine if the color is dark based on luminance."""
-    hex_color = hex_color.lstrip('#')
-    r, g, b = (int(hex_color[i:i+2], 16) for i in (0, 2, 4))
-    brightness = (r * 299 + g * 587 + b * 114) / 1000
-    return brightness < 128
+    hex_color = hex_color.lstrip("#")
+    try:
+        r, g, b = (int(hex_color[i : i + 2], 16) for i in (0, 2, 4))
+        brightness = (r * 299 + g * 587 + b * 114) / 1000
+        return brightness < 128
+    except (ValueError, IndexError):
+        print(f"Warning: Invalid color format '{hex_color}', defaulting to dark theme")
+        return True
+
 
 def get_hex_from_colors_file():
     """Read the first color from the colors file."""
     try:
-        with open(COLORS_FILE, 'r') as file:
-            return file.readline().strip()
+        with open(COLORS_FILE, "r") as file:
+            color = file.readline().strip()
+            if not color:
+                raise ValueError("Colors file is empty")
+            return color
     except FileNotFoundError:
         sys.exit(f"Error: Colors file not found: {COLORS_FILE}")
+    except ValueError as e:
+        sys.exit(f"Error reading colors file: {e}")
+
 
 def acquire_lock():
     """Create a lock file to prevent multiple instances."""
-    if os.path.exists(LOCK_FILE):
-        sys.exit("Another instance is already running. Exiting...")
-    open(LOCK_FILE, 'w').close()
+    if LOCK_FILE.exists():
+        # Check if the process is actually running
+        try:
+            with open(LOCK_FILE, "r") as f:
+                pid = f.read().strip()
+                if pid and os.path.exists(f"/proc/{pid}"):
+                    sys.exit("Another instance is already running. Exiting...")
+        except:
+            pass
+        # Stale lock file, remove it
+        LOCK_FILE.unlink()
+
+    # Write current PID to lock file
+    with open(LOCK_FILE, "w") as f:
+        f.write(str(os.getpid()))
+
 
 def release_lock():
     """Remove the lock file."""
-    if os.path.exists(LOCK_FILE):
-        os.remove(LOCK_FILE)
+    try:
+        LOCK_FILE.unlink(missing_ok=True)
+    except Exception as e:
+        print(f"Warning: Could not remove lock file: {e}")
+
 
 def copy_file(src, dst, skip_if_exists=False):
     """Copy a file from src to dst, optionally skipping if dst exists."""
-    if skip_if_exists and os.path.exists(dst):
+    src = Path(src)
+    dst = Path(dst)
+
+    if skip_if_exists and dst.exists():
         print(f"File already exists at {dst}, skipping copy.")
-        return
+        return True
+
+    if not src.exists():
+        print(f"Warning: Source file not found: {src}")
+        return False
 
     try:
-        os.makedirs(os.path.dirname(dst), exist_ok=True)
-        shutil.copy(src, dst)
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dst)  # copy2 preserves metadata
         print(f"File copied from {src} to {dst}.")
+        return True
     except Exception as e:
-        sys.exit(f"Error copying file from {src} to {dst}: {e}")
+        print(f"Error copying file from {src} to {dst}: {e}")
+        return False
+
+
+def wait_for_file_stability(filepath, timeout=2.0, check_interval=0.1):
+    """Wait until file stops being modified."""
+    filepath = Path(filepath)
+    if not filepath.exists():
+        return False
+
+    last_hash = get_file_hash(filepath)
+    elapsed = 0
+
+    while elapsed < timeout:
+        time.sleep(check_interval)
+        elapsed += check_interval
+        current_hash = get_file_hash(filepath)
+
+        if current_hash == last_hash:
+            return True
+        last_hash = current_hash
+
+    return True  # Proceed anyway after timeout
+
 
 def on_file_modified():
     """Handle file modifications based on current color scheme."""
-    is_dark_theme = is_dark(get_hex_from_colors_file())
-    mode = "dark" if is_dark_theme else "light"
-    
-    copy_file(FALLBACK_THEME, CACHE_SRC[mode], skip_if_exists=True)
-    copy_file(TEMPLATE_SRC[mode], TEMPLATE_DST[mode])
-    copy_file(CACHE_SRC[mode], CACHE_DST)
+    global last_processed_hash, processing
 
-    # Signal running nvim instances, don't exit based on the result here.
-    subprocess.run(['killall', '-SIGUSR1', 'nvim'])
+    # Prevent concurrent processing
+    if processing:
+        print("Already processing an update, skipping...")
+        return
 
-# Watchdog event handler
-class MyHandler(FileSystemEventHandler):
+    processing = True
+    try:
+        # Wait for the file to stabilize
+        time.sleep(0.2)  # Initial delay
+
+        is_dark_theme = is_dark(get_hex_from_colors_file())
+        mode = "dark" if is_dark_theme else "light"
+
+        print(f"Detected {mode} theme")
+
+        # Wait for the cache file to be fully written
+        wait_for_file_stability(CACHE_SRC[mode])
+
+        # Check if we've already processed this exact file
+        current_hash = get_file_hash(CACHE_SRC[mode])
+        if current_hash == last_processed_hash:
+            print("No changes detected, skipping update")
+            return
+
+        # Copy fallback theme if needed (only once)
+        copy_file(FALLBACK_THEME, CACHE_SRC[mode], skip_if_exists=True)
+
+        # Copy template
+        if not copy_file(TEMPLATE_SRC[mode], TEMPLATE_DST[mode]):
+            print(f"Warning: Failed to copy template for {mode} mode")
+
+        # Wait a bit to ensure pywal has finished processing
+        time.sleep(0.3)
+        wait_for_file_stability(CACHE_SRC[mode])
+
+        # Copy to final destination
+        if copy_file(CACHE_SRC[mode], CACHE_DST):
+            last_processed_hash = get_file_hash(CACHE_DST)
+            print("Theme update completed successfully")
+
+            # Signal running nvim instances
+            result = subprocess.run(
+                ["killall", "-SIGUSR1", "nvim"], capture_output=True, timeout=1
+            )
+            if result.returncode == 0:
+                print("Signaled nvim instances to reload")
+        else:
+            print("Warning: Failed to copy theme to final destination")
+
+    except Exception as e:
+        print(f"Error during file modification handling: {e}")
+    finally:
+        processing = False
+
+
+class ThemeChangeHandler(FileSystemEventHandler):
+    """Handler for file system events."""
+
+    def __init__(self):
+        self.last_event_time = 0
+        self.debounce_seconds = 0.5
+
     def on_modified(self, event):
-        if event.src_path == CACHE_SRC["dark"]:
+        """Handle file modification events with debouncing."""
+        if event.is_directory:
+            return
+
+        # Check both dark and light cache files
+        if event.src_path in [str(CACHE_SRC["dark"]), str(CACHE_SRC["light"])]:
+            current_time = time.time()
+            if current_time - self.last_event_time < self.debounce_seconds:
+                return
+
+            self.last_event_time = current_time
+            print(f"\nDetected change in {event.src_path}")
             on_file_modified()
 
-def monitor_file(file_path):
-    """Monitor the specified file for changes."""
-    event_handler = MyHandler()
+
+def is_nvim_running():
+    """Check if any nvim instances are running."""
+    try:
+        result = subprocess.run(["pgrep", "-x", "nvim"], capture_output=True, timeout=1)
+        return result.returncode == 0
+    except subprocess.TimeoutExpired:
+        return False
+
+
+def monitor_files():
+    """Monitor cache files for changes."""
+    event_handler = ThemeChangeHandler()
     observer = Observer()
-    observer.schedule(event_handler, os.path.dirname(file_path), recursive=False)
+
+    # Monitor both cache directories
+    for cache_file in CACHE_SRC.values():
+        watch_dir = cache_file.parent
+        if watch_dir.exists():
+            observer.schedule(event_handler, str(watch_dir), recursive=False)
+            print(f"Monitoring {watch_dir}")
+
     observer.start()
+    print("Monitoring started. Press Ctrl+C to stop.")
 
     try:
         while True:
-            # Check every 5 seconds if nvim is running
             time.sleep(5)
-            # Use pgrep to check for exact process name 'nvim'
-            result = subprocess.run(['pgrep', '-x', 'nvim'], capture_output=True)
-            if result.returncode != 0:
-                print("No running nvim instances found. Exiting.")
-                observer.stop() # Stop the observer thread
-                break # Exit the loop
+            if not is_nvim_running():
+                print("\nNo running nvim instances found. Exiting.")
+                break
     except KeyboardInterrupt:
         print("\nKeyboard interrupt received. Exiting.")
-        observer.stop()
     finally:
-        # Ensure the observer thread is joined before exiting
-        observer.join()
+        observer.stop()
+        observer.join(timeout=2)
 
-if __name__ == "__main__":
+
+def main():
+    """Main entry point."""
+    # Perform initial setup
+    print("Starting Pywal-Neovim theme synchronization...")
     on_file_modified()
+
+    # Acquire lock and start monitoring
     acquire_lock()
     try:
-        on_file_modified()
-        monitor_file(CACHE_SRC["dark"])
+        monitor_files()
     finally:
         release_lock()
+        print("Cleanup completed. Goodbye!")
+
+
+if __name__ == "__main__":
+    main()
