@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import sys
 import time
+import errno
 from pathlib import Path
 
 from watchdog.events import FileSystemEventHandler
@@ -71,22 +72,36 @@ def get_hex_from_colors_file():
 
 
 def acquire_lock():
-    """Create a lock file to prevent multiple instances."""
-    if LOCK_FILE.exists():
-        # Check if the process is actually running
+    """Create a lock file to prevent multiple instances. Without recursion."""
+    retries = 3
+    while retries > 0:
+        try:
+            lock_fd = os.open(LOCK_FILE, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            os.write(lock_fd, str(os.getpid()).encode())
+            os.close(lock_fd)
+            return
+        except OSError as e:
+            if e.errno != errno.EEXIST:
+                raise
         try:
             with open(LOCK_FILE, "r") as f:
-                pid = f.read().strip()
-                if pid and os.path.exists(f"/proc/{pid}"):
-                    sys.exit("Another instance is already running. Exiting...")
-        except:
-            pass
-        # Stale lock file, remove it
-        LOCK_FILE.unlink()
+                content = f.read().strip()
+                if not content:
+                     raise ValueError("Empty lock file")
+                pid = int(content)
 
-    # Write current PID to lock file
-    with open(LOCK_FILE, "w") as f:
-        f.write(str(os.getpid()))
+            if os.path.exists(f"/proc/{pid}"):
+                sys.exit(0)
+        except (FileNotFoundError, ValueError):
+            pass
+        try:
+            LOCK_FILE.unlink()
+        except FileNotFoundError:
+            pass
+
+        retries -= 1
+        time.sleep(0.1) 
+    sys.exit("Error: Could not acquire lock after multiple retries.")
 
 
 def release_lock():
@@ -187,7 +202,7 @@ def on_file_modified():
 
             # Signal running nvim instances
             result = subprocess.run(
-                ["killall", "-SIGUSR1", "nvim"], capture_output=True, timeout=1
+                ["pkill", "-SIGUSR1", "nvim"], capture_output=True, timeout=1
             )
             if result.returncode == 0:
                 print("Signaled nvim instances to reload")
@@ -262,12 +277,12 @@ def monitor_files():
 
 def main():
     """Main entry point."""
+    # Acquire lock and start monitoring
+    acquire_lock()
+
     # Perform initial setup
     print("Starting Pywal-Neovim theme synchronization...")
     on_file_modified()
-
-    # Acquire lock and start monitoring
-    acquire_lock()
     try:
         monitor_files()
     finally:
